@@ -1,0 +1,55 @@
+name: Continuous Integration - Reusable
+on:                                                  #on when you want to run this- with workflowcall
+  workflow_call:
+    inputs:
+      project-name:
+        required: true
+        type: string
+      npm_install:
+        required: true
+        type: boolean
+    secrets:
+      vault_token:
+        required: true
+
+jobs:
+  CI_Steps:
+    runs-on: [self-hosted]                                         #added runner that we created
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - name: Import Vault Secrets
+        id: vault-secrets
+        uses: hashicorp/vault-action@v2
+        with:
+          url: https://vault-internal.rajdevops.online:8200/
+          token: ${{ secrets.vault_token }}
+          tlsSkipVerify: true
+          secrets: |
+            common/data/common sonarqube_user | sonarqube_user;
+            common/data/common sonarqube_password | sonarqube_password ;
+
+      - run: echo ok
+        name: Code lint
+
+      #  k    - run: echo ok
+      #        name: Code Test
+
+
+      #      - run: echo npm run test:unit
+      #        name: Code Unit Tests
+
+      - run: env
+        #      echo npm run test:integration
+        name: code Unit Tests
+
+#      - run: /opt/sonar-scanner-5.0.1.3006-linux/bin/sonar-scanner -Dsonar.host.url=http://sonarqube-internal.rajdevops.online:9000 -Dsonar.projectKey=${{ inputs.project-name }} -Dsonar.qualitygate.wait=true -Dsonar.login=${{ steps.vault-secrets.outputs.sonarqube_user }} -Dsonar.password=${{ steps.vault-secrets.outputs.sonarqube_password }}
+#        name: Code Review
+#
+#      - run: env
+#        name: env
+#
+#      - run: echo ok
+#        name: Release Software
+#        if:  ${{ startsWith(github.ref, 'refs/tags/') }}

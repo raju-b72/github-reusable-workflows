@@ -1,0 +1,65 @@
+name: Release - Reusable
+on:                                                  #on when you want to run this- with workflowcall
+  workflow_call:
+    inputs:
+      project-name:
+        required: true
+        type: string
+      release_archive_file:
+        required: true
+        type: string
+      npm_install:
+        required: true
+        type: boolean
+    secrets:
+      vault_token:
+        required: true
+
+jobs:
+  CI_Steps:
+    runs-on: [self-hosted]                                         #added runner that we createdkjojg
+    steps:
+      - name: Code Checkout
+        uses: actions/checkout@v4
+
+      - run: npm install
+        name: Install NodeJS modules
+        if: ${{ inputs.npm_install }}
+
+      - name: Import Vault Secrets
+        id: vault-secrets
+        uses: hashicorp/vault-action@v2
+        with:
+          url: https://vault-internal.rajdevops.online:8200/
+          token: ${{ secrets.vault_token }}
+          tlsSkipVerify: true
+          secrets: |
+            common/data/common artifactory_user | artifactory_user;
+            common/data/common artifactory_password | artifactory_password ;
+      
+
+      #wwwe2h
+      - run: echo ${GITHUB_REF_NAME} >version
+        name: Create Version File
+
+
+      - name: Prepare Artifact
+        run: zip -r artifact.zip ${{ inputs.release_archive_file }}
+
+
+      - run: curl -f -v --user ${{ steps.vault-secrets.outputs.artifactory_user }}:${{ steps.vault-secrets.outputs.artifactory_password }} --data-binary @artifact.zip -X PUT "http://artifactory-internal.rajdevops.online:8081/artifactory/${{ inputs.project-name }}/${GITHUB_REF_NAME}.zip"
+        name: Upload Artifact
+      # f q j     if:  ${{ startsWith(github.ref, 'refs/tags/') }}
+
+      - run: |
+          echo '{
+          "environment_variables": [
+            {
+              "name": "APP_VERSION",
+              "secure": false,
+              "value": "app_version"
+            }
+          ],
+          "update_materials_before_scheduling": true                                 
+          }' | sed -e "s/app_version/${GITHUB_REF_NAME}/" | jq >data.json
+          curl 'http://172.31.85.63:8153/go/api/pipelines/${{ inputs.project_name }}/schedule' -H 'Accept: application/vnd.go.cd.v1+json' -H 'Content-Type: application/json' -X POST -d "@data.json"
